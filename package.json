@@ -7,7 +7,8 @@
   },
   "scripts": {
     "dev": "serverless offline ",
-    "deploy": "sls deploy -v"
+    "deploy": "sls deploy -v",
+    "dynamo:start": "serverless dynamodb start"
   },
   "dependencies": {
     "@middy/core": "^1.5.2",
