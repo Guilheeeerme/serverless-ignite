@@ -1,5 +1,5 @@
 service:
-  name: ignitecertificate
+  name: ignite-certificates
 
 plugins:
   - serverless-offline
@@ -9,7 +9,16 @@ plugins:
 provider:
   name: aws
   runtime: nodejs14.x
-  region: sa-eats-1
+  region: us-east-1
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:*
+      Resource: "*"
+    - Effect: Allow
+      Action:
+        - dynamodb:*
+      Resource: "*"
 
 custom:
   webpack:
@@ -25,32 +34,63 @@ custom:
       migrate: true
 
 functions:
-  generateCertificate:
-    handler: src/functions/generateCertificate.handle
+  create-certificate:
+    handler: src/handlers/generateCertificate.handle
     events:
       - http:
-          path: /generateCertificate
-          method: POST
+          path: /certificates
+          method: post
           cors: true
-  verifyCertificate:
-    handler: src/functions/verifyCertificate.handle
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:Query
+          - dynamodb:PutItem
+        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/certificates"
+
+  verify-certificate:
+    handler: src/handlers/verifyCertificate.handle
     events:
       - http:
-          path: /verifyCertificate/{id}
+          path: /certificates/{id}
+          method: get
           cors: true
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:Query
+        Resource: "arn:aws:dynamodb:${self:provider.region}:*:table/certificates"
 
 resources:
   Resources:
-    dbCertificateUsers:
+    CertificatesTable:
       Type: AWS::DynamoDB::Table
       Properties:
-        TableName: users_certificates
-        ProvisionedThroughput:
-          ReadCapacityUnits: 5
-          WriteCapacityUnits: 5
+        TableName: certificates
         AttributeDefinitions:
-          - AttibuteName: id
+          - AttributeName: id
             AttributeType: S
         KeySchema:
-          - AttibuteName: id
+          - AttributeName: id
             KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+
+    CertificatesBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: mvc-ignite-certificates
+
+    CertificatesBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: !Ref CertificatesBucket
+        PolicyDocument:
+          Statement:
+            - Sid: PublicRead
+              Effect: Allow
+              Principal: "*"
+              Action:
+                - s3:GetObject
+              Resource: arn:aws:s3:::mvc-ignite-certificates/*
